@@ -1,0 +1,13 @@
+# Root
+*.env
+.env.*
+# Ma traccia i template di esempio (documentazione setup, nessun segreto)
+!.env.example
+*.db
+node_modules/
+dist/
+coverage/
+logs/
+*.log
+*.key
+*.pem

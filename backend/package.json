@@ -1,0 +1,59 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "smoke:compiled": "node -e \"require('./dist/app.js'); require('./dist/routes/stripe.js'); require('./dist/routes/admin.js'); require('./dist/routes/authRoutes.js'); require('./dist/routes/workosWebhookRoutes.js')\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:ui": "vitest run --config vitest.e2e.config.ts test/e2e/browser-ui.e2e.test.ts test/e2e/frontend.e2e.test.ts test/e2e/console.e2e.test.ts test/e2e/venue_onboarding.e2e.test.ts",
+    "playwright:install": "playwright install --with-deps chromium",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:validate": "prisma validate",
+    "db:status": "prisma migrate status",
+    "db:seed": "tsx src/scripts/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "dependencies": {
+    "@fastify/compress": "^9.1.0",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/rate-limit": "^11.1.0",
+    "@fastify/static": "^10.1.0",
+    "@prisma/client": "^6.12.0",
+    "@workos-inc/node": "^10.8.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.10.0",
+    "fastify-raw-body": "^5.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "shared": "*",
+    "stripe": "^22.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "nock": "^14.0.0",
+    "prisma": "^6.12.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.4"
+  }
+}

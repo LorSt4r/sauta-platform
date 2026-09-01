@@ -1,0 +1,473 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Venue {
+  id                    String   @id @default(uuid())
+  name                  String
+  stripeAccountId       String?  @unique @map("stripe_account_id")
+  // [FIX 3.2] Application fee per-centuale (Sauta trattiene X% di ogni pagamento)
+  applicationFeePercent Float    @default(2.9) @map("application_fee_percent")
+  isActive              Boolean  @default(false) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  // [FIX 2.4] Dati fiscali venue
+  vatNumber     String? @map("vat_number") // Partita IVA
+  fiscalAddress String? @map("fiscal_address")
+  fiscalCity    String? @map("fiscal_city")
+  fiscalZip     String? @map("fiscal_zip")
+
+  // [FIX 3.4] Stripe Connect onboarding status
+  stripeChargesEnabled Boolean   @default(false) @map("stripe_charges_enabled")
+  stripePayoutsEnabled Boolean   @default(false) @map("stripe_payouts_enabled")
+  stripeOnboardedAt    DateTime? @map("stripe_onboarded_at")
+
+  acubeOrganizationId String? @map("acube_organization_id")
+  acubeApiKey         String? @map("acube_api_key")
+
+  // [Wave 9C.0B] WorkOS Organization Mapping
+  workosOrganizationId String? @unique @map("workos_organization_id")
+
+  sessions             CheckoutSession[]
+  tickets              Ticket[]
+  products             Product[]
+  domains              VenueDomain[]
+  memberships          VenueMembership[]
+  authAuditEvents      AuthAuditEvent[]
+  onboarding           VenueOnboarding?
+  onboardingSteps      VenueOnboardingStep[]
+  invitations          VenueInvitation[]
+  provisioningCommands IdentityProvisioningCommand[]
+
+  @@map("venues")
+}
+
+enum VenueDomainType {
+  PLATFORM
+  CUSTOM
+}
+
+enum VenueDomainStatus {
+  PENDING
+  VERIFIED
+  DISABLED
+}
+
+model VenueDomain {
+  id         String            @id @default(uuid())
+  venueId    String            @map("venue_id")
+  hostname   String            @unique
+  type       VenueDomainType
+  status     VenueDomainStatus
+  isPrimary  Boolean           @default(false) @map("is_primary")
+  verifiedAt DateTime?         @map("verified_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([status])
+  @@map("venue_domains")
+}
+
+model CheckoutSession {
+  id                      String            @id @default(uuid())
+  venueId                 String            @map("venue_id")
+  stripePaymentIntentId   String?           @unique @map("stripe_payment_intent_id")
+  status                  String            @default("pending") // pending|paid|cancelled|refunded|failed
+  // [FIX 2.1] fiscalStatus separato da status (lo stato payment != stato fiscale)
+  fiscalStatus            String            @default("pending") @map("fiscal_status") // pending|invoiced|voided|storno
+  fiscalDocNumber         String?           @map("fiscal_doc_number") // numero documento RT
+  fiscalZetaNumber        String?           @map("fiscal_zeta_number") // numero Z chiusura giornata
+  totalAmount             Int               @map("total_amount")
+  currency                String            @default("EUR")
+  digitalConsent          Boolean           @default(false) @map("digital_consent")
+  digitalConsentTimestamp DateTime?         @map("digital_consent_timestamp") // [Wave 4] timestamp esplicito del consenso GDPR D.M. 07/12/2016
+  email                   String?           @map("email") // [Wave 4] non raccolto attivamente — Privacy by Design
+  createdAt               DateTime          @default(now()) @map("created_at")
+  // [FIX 2.3] Annulli/storni
+  voidedAt                DateTime?         @map("voided_at")
+  voidedReason            String?           @map("voided_reason")
+  voidedById              String?           @map("voided_by_id") // userId che ha annullato
+  // [FIX 2.2] Metadati POS-RT L. 207/2024
+  paymentMethod           String?           @map("payment_method") // card|cash|apple_pay|google_pay
+  paymentTerminalId       String?           @map("payment_terminal_id")
+  fiscalReceiptUrl        String?           @map("fiscal_receipt_url")
+  venue                   Venue             @relation(fields: [venueId], references: [id])
+  tickets                 Ticket[]
+  walletCapability        WalletCapability?
+
+  @@index([venueId])
+  @@map("checkout_sessions")
+}
+
+model WalletCapability {
+  id        String          @id @default(uuid())
+  sessionId String          @unique @map("session_id")
+  tokenHash String          @unique @map("token_hash")
+  createdAt DateTime        @default(now()) @map("created_at")
+  revokedAt DateTime?       @map("revoked_at")
+  session   CheckoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_capabilities")
+}
+
+model Ticket {
+  id            String          @id @default(uuid())
+  sessionId     String          @map("session_id")
+  venueId       String          @map("venue_id")
+  productName   String          @map("product_name")
+  price         Int
+  // [FIX 2.5] priceSnapshot: prezzo al momento dell'acquisto (immutable, anti-price-change)
+  priceSnapshot Int?            @map("price_snapshot")
+  // [FIX 2.4] vatRate per-prodotto (IVA 10% somministrazione, 22% altro)
+  vatRate       Float           @default(10.0) @map("vat_rate")
+  status        String          @default("valid") // valid|used|voided|storno
+  usedAt        DateTime?       @map("used_at")
+  // [FIX 2.3] Annulli/storni
+  voidedAt      DateTime?       @map("voided_at")
+  voidedReason  String?         @map("voided_reason")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  session       CheckoutSession @relation(fields: [sessionId], references: [id])
+  venue         Venue           @relation(fields: [venueId], references: [id])
+
+  @@index([sessionId])
+  @@index([venueId])
+  @@index([id, status])
+  @@map("tickets")
+}
+
+model FiscalLog {
+  id             String   @id @default(uuid())
+  sessionId      String   @map("session_id")
+  timestamp      DateTime @default(now())
+  printerBrand   String   @map("printer_brand")
+  commandPayload String   @map("command_payload")
+  statusResponse String   @map("status_response")
+  success        Boolean
+  errorMessage   String?  @map("error_message")
+
+  // [FIX 1.5] Hash chain per tamper-evidence fiscale
+  sequenceNumber Int    @default(0) @map("sequence_number")
+  previousHash   String @default("") @map("previous_hash")
+  hash           String @default("")
+
+  venueId String? @map("venue_id")
+
+  // [FIX 2.8] operationKind + correlativeId per tracciabilità storni/annulli
+  operationKind String  @default("stampa") @map("operation_kind") // stampa|annullamento|storno|chiusura
+  correlativeId String? @map("correlative_id") // ID del FiscalLog correlato (es. originale per storno)
+
+  @@unique([venueId, sequenceNumber])
+  @@index([sessionId, operationKind])
+  @@map("fiscal_logs")
+}
+
+model Product {
+  id      String  @id @default(uuid())
+  venueId String  @map("venue_id")
+  slug    String
+  name    String
+  price   Int
+  // [FIX 2.4] IVA per-prodotto (default 10% somministrazione alcolici)
+  vatRate Float   @default(10.0) @map("vat_rate")
+  active  Boolean @default(true)
+  venue   Venue   @relation(fields: [venueId], references: [id])
+
+  @@unique([venueId, slug])
+  @@map("products")
+}
+
+model ProcessedWebhookEvent {
+  id        String   @id @map("id")
+  eventType String   @map("event_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("processed_webhook_events")
+}
+
+// --- WAVE 9C.0B IDENTITY, MEMBERSHIP & AUDIT MODELS ---
+
+enum PlatformUserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEPROVISIONED
+}
+
+enum PlatformRole {
+  NONE
+  PLATFORM_ADMIN
+}
+
+model PlatformUser {
+  id               String             @id @default(uuid())
+  workosUserId     String?            @unique @map("workos_user_id")
+  emailNormalized  String             @unique @map("email_normalized")
+  status           PlatformUserStatus @default(INVITED)
+  platformRole     PlatformRole       @default(NONE) @map("platform_role")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  lastReconciledAt DateTime?          @map("last_reconciled_at")
+
+  memberships         VenueMembership[]
+  authAuditEvents     AuthAuditEvent[]
+  createdInvitations  VenueInvitation[]         @relation("InvitationCreatedBy")
+  receivedInvitations VenueInvitation[]         @relation("InvitationUser")
+  reviewedOnboardings VenueOnboarding[]         @relation("OnboardingReviewedBy")
+  mutationReceipts    PlatformMutationReceipt[]
+
+  @@map("platform_users")
+}
+
+enum VenueRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum VenueMembershipStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+model VenueMembership {
+  id                 String                @id @default(uuid())
+  userId             String                @map("user_id")
+  venueId            String                @map("venue_id")
+  workosMembershipId String?               @unique @map("workos_membership_id")
+  role               VenueRole
+  status             VenueMembershipStatus @default(PENDING)
+  activatedAt        DateTime?             @map("activated_at")
+  workosUpdatedAt    DateTime?             @map("workos_updated_at")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  user  PlatformUser @relation(fields: [userId], references: [id])
+  venue Venue        @relation(fields: [venueId], references: [id])
+
+  @@unique([userId, venueId])
+  @@index([venueId, status])
+  @@index([userId, status])
+  @@map("venue_memberships")
+}
+
+model ProcessedWorkosEvent {
+  eventId         String    @id @map("event_id")
+  eventType       String    @map("event_type")
+  workosCreatedAt DateTime? @map("workos_created_at")
+  processedAt     DateTime  @default(now()) @map("processed_at")
+
+  @@map("processed_workos_events")
+}
+
+enum AuthAuditOutcome {
+  SUCCESS
+  DENIED
+  ERROR
+}
+
+enum AuthAuditChannel {
+  USER
+  WEBHOOK
+  RECONCILIATION
+  SYSTEM
+}
+
+model AuthAuditEvent {
+  id                   String           @id @default(uuid())
+  schemaVersion        Int              @default(1) @map("schema_version")
+  requestId            String           @map("request_id")
+  actorUserId          String?          @map("actor_user_id")
+  actorWorkosUserId    String?          @map("actor_workos_user_id")
+  venueId              String?          @map("venue_id")
+  workosOrganizationId String?          @map("workos_organization_id")
+  action               String
+  targetType           String?          @map("target_type")
+  targetId             String?          @map("target_id")
+  permission           String?
+  outcome              AuthAuditOutcome
+  reasonCode           String           @map("reason_code")
+  channel              AuthAuditChannel
+  sessionIdHash        String?          @map("session_id_hash")
+  originFingerprint    String?          @map("origin_fingerprint")
+  createdAt            DateTime         @default(now()) @map("created_at")
+
+  actorUser PlatformUser? @relation(fields: [actorUserId], references: [id])
+  venue     Venue?        @relation(fields: [venueId], references: [id])
+
+  @@index([venueId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("auth_audit_events")
+}
+
+// --- WAVE 9C.0C VENUE ONBOARDING & IDENTITY PROVISIONING MODELS ---
+
+enum VenueOnboardingStatus {
+  DRAFT
+  IN_PROGRESS
+  READY_FOR_REVIEW
+  ACTIVE
+  SUSPENDED
+}
+
+enum VenueOnboardingStepName {
+  OWNER
+  LEGAL
+  DOMAIN
+  CATALOG
+  STRIPE
+  FISCAL
+  OPERATIONS
+}
+
+enum VenueOnboardingStepStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  READY
+}
+
+enum VenueOnboardingStepSource {
+  SYSTEM
+  OWNER
+  PLATFORM_REVIEW
+  PROVIDER
+  LEGACY_BACKFILL
+}
+
+model VenueOnboarding {
+  venueId          String                   @id @map("venue_id")
+  status           VenueOnboardingStatus    @default(DRAFT)
+  currentStep      VenueOnboardingStepName? @map("current_step")
+  submittedAt      DateTime?                @map("submitted_at")
+  reviewedAt       DateTime?                @map("reviewed_at")
+  activatedAt      DateTime?                @map("activated_at")
+  suspendedAt      DateTime?                @map("suspended_at")
+  reviewedByUserId String?                  @map("reviewed_by_user_id")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+
+  venue      Venue         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  reviewedBy PlatformUser? @relation("OnboardingReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("venue_onboardings")
+}
+
+model VenueOnboardingStep {
+  id          String                    @id @default(uuid())
+  venueId     String                    @map("venue_id")
+  step        VenueOnboardingStepName
+  status      VenueOnboardingStepStatus @default(NOT_STARTED)
+  source      VenueOnboardingStepSource @default(SYSTEM)
+  reasonCode  String?                   @map("reason_code")
+  completedAt DateTime?                 @map("completed_at")
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  updatedAt   DateTime                  @updatedAt @map("updated_at")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, step])
+  @@index([venueId, status])
+  @@map("venue_onboarding_steps")
+}
+
+enum VenueInvitationStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  REVOKED
+  EXPIRED
+  FAILED
+}
+
+model VenueInvitation {
+  id                     String                @id @default(uuid())
+  venueId                String                @map("venue_id")
+  userId                 String?               @map("user_id")
+  invitedEmailNormalized String                @map("invited_email_normalized")
+  role                   VenueRole             @default(OWNER)
+  status                 VenueInvitationStatus @default(PENDING)
+  workosInvitationId     String?               @unique @map("workos_invitation_id")
+  expiresAt              DateTime?             @map("expires_at")
+  sentAt                 DateTime?             @map("sent_at")
+  acceptedAt             DateTime?             @map("accepted_at")
+  revokedAt              DateTime?             @map("revoked_at")
+  createdByUserId        String                @map("created_by_user_id")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+
+  venue                Venue                         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user                 PlatformUser?                 @relation("InvitationUser", fields: [userId], references: [id])
+  createdByUser        PlatformUser                  @relation("InvitationCreatedBy", fields: [createdByUserId], references: [id])
+  provisioningCommands IdentityProvisioningCommand[]
+
+  @@index([venueId, status])
+  @@index([invitedEmailNormalized])
+  @@map("venue_invitations")
+}
+
+enum IdentityProvisioningKind {
+  CREATE_ORGANIZATION
+  SEND_INVITATION
+  REVOKE_INVITATION
+  RESEND_INVITATION
+}
+
+enum IdentityProvisioningStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  RETRYABLE
+  FAILED
+}
+
+model IdentityProvisioningCommand {
+  id             String                     @id @default(uuid())
+  venueId        String                     @map("venue_id")
+  invitationId   String?                    @map("invitation_id")
+  kind           IdentityProvisioningKind
+  status         IdentityProvisioningStatus @default(PENDING)
+  dedupKey       String                     @unique @map("dedup_key")
+  requestHash    String                     @map("request_hash")
+  attempts       Int                        @default(0)
+  availableAt    DateTime                   @default(now()) @map("available_at")
+  leaseUntil     DateTime?                  @map("lease_until")
+  lastReasonCode String?                    @map("last_reason_code")
+  completedAt    DateTime?                  @map("completed_at")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  venue      Venue            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  invitation VenueInvitation? @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([leaseUntil])
+  @@index([venueId])
+  @@map("identity_provisioning_commands")
+}
+
+model PlatformMutationReceipt {
+  id             String   @id @default(uuid())
+  actorUserId    String   @map("actor_user_id")
+  route          String
+  dedupKey       String   @unique @map("dedup_key")
+  requestHash    String   @map("request_hash")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  actor PlatformUser @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserId, createdAt])
+  @@map("platform_mutation_receipts")
+}

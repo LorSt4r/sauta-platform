@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Sauta — Console Amministrativa</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+      .console-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 24px;
+      }
+      .console-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 24px;
+        backdrop-filter: blur(12px);
+      }
+      .console-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        background: rgba(99, 102, 241, 0.2);
+        color: #818cf8;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+      }
+      .form-select {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 14px;
+        background: #18181b;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: #ffffff;
+        font-size: 1rem;
+        margin-top: 10px;
+      }
+      .btn-console {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 1rem;
+        cursor: pointer;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .btn-primary-console {
+        background: #6366f1;
+        color: #ffffff;
+      }
+      .btn-primary-console:hover {
+        background: #4f46e5;
+      }
+      .btn-secondary-console {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .btn-secondary-console:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .btn-console:focus-visible,
+      .form-select:focus-visible {
+        outline: 3px solid #a5b4fc;
+        outline-offset: 3px;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .console-stack {
+        display: grid;
+        gap: 18px;
+        margin-top: 24px;
+      }
+      .console-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .console-field {
+        display: grid;
+        gap: 6px;
+        color: #d4d4d8;
+        font-size: 0.9rem;
+      }
+      .console-input {
+        min-height: 44px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: #18181b;
+        color: #fff;
+      }
+      .console-table-wrap {
+        overflow-x: auto;
+      }
+      .console-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .console-message {
+        min-height: 1.4rem;
+        color: #a1a1aa;
+      }
+      .console-card h3,
+      .console-card h4 {
+        margin-top: 0;
+      }
+      @media (max-width: 520px) {
+        .console-container {
+          margin: 12px auto;
+          padding: 12px;
+        }
+        .console-card {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="console-app" class="console-container">
+      <header class="glass-header" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 style="margin: 0; font-size: 1.8rem;">Sauta Console</h1>
+            <p style="margin: 4px 0 0 0; color: #a1a1aa;">Portale Identità e Accessi Venue</p>
+          </div>
+          <span id="console-status-badge" class="console-badge">Caricamento...</span>
+        </div>
+      </header>
+
+      <!-- Stato Non Autenticato (Login) -->
+      <main id="login-section" class="console-card hidden">
+        <h2 style="margin-top: 0;">Accesso Console</h2>
+        <p style="color: #a1a1aa; margin-bottom: 24px;">
+          L'accesso alla console Sauta è riservato ai gestori di venue ed agli amministratori di piattaforma. Autenticati tramite AuthKit.
+        </p>
+        <button id="btn-login-authkit" class="btn-console btn-primary-console">
+          Accedi con AuthKit 🔑
+        </button>
+      </main>
+
+      <!-- Stato Autenticato (Dashboard Console) -->
+      <main id="dashboard-section" class="console-card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px;">
+          <div>
+            <h2 id="user-email-heading" style="margin: 0; font-size: 1.4rem;">--</h2>
+            <span id="user-platform-role" class="console-badge" style="margin-top: 6px;">--</span>
+          </div>
+          <button id="btn-logout-console" class="btn-console btn-secondary-console">
+            Esci 🚪
+          </button>
+        </div>
+
+        <!-- Sezione Selezione Venue / Switch Organizzazione -->
+        <div style="margin-bottom: 24px;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px;">Organizzazione / Venue Attiva</h3>
+          <p style="font-size: 0.9rem; color: #a1a1aa; margin-bottom: 8px;">
+            Seleziona la venue di cui intendi gestire il contesto operativo:
+          </p>
+          <select id="venue-select" class="form-select"></select>
+          <button id="btn-switch-venue" class="btn-console btn-secondary-console" style="margin-top: 12px; width: 100%;">
+            Seleziona Venue
+          </button>
+        </div>
+
+        <!-- Dettagli Venue Corrente -->
+        <div id="venue-details-card" class="console-card" style="background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.06);">
+          <h4 id="current-venue-name" style="margin-top: 0; font-size: 1.2rem;">Nessuna venue selezionata</h4>
+          <p id="current-venue-role" style="font-size: 0.9rem; color: #a1a1aa;">--</p>
+          <div id="current-venue-permissions" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;"></div>
+        </div>
+
+        <section id="platform-onboarding-section" class="console-stack hidden" aria-labelledby="platform-onboarding-title">
+          <div class="console-card">
+            <h3 id="platform-onboarding-title">Onboarding piattaforma</h3>
+            <form id="platform-create-venue-form" class="console-stack">
+              <div class="console-grid">
+                <label class="console-field">
+                  Nome venue
+                  <input id="platform-venue-name" class="console-input" required maxlength="255" />
+                </label>
+                <label class="console-field">
+                  Slug
+                  <input id="platform-venue-slug" class="console-input" required minlength="3" maxlength="63" pattern="[a-z0-9-]+" />
+                </label>
+                <label class="console-field">
+                  Email OWNER
+                  <input id="platform-owner-email" class="console-input" type="email" required maxlength="255" />
+                </label>
+              </div>
+              <button id="btn-create-platform-venue" class="btn-console btn-primary-console" type="submit">Crea draft venue</button>
+            </form>
+            <p id="platform-create-message" class="console-message" role="status"></p>
+          </div>
+
+          <div class="console-card">
+            <h3>Venue e provisioning</h3>
+            <select id="platform-venue-select" class="form-select" aria-label="Venue platform"></select>
+            <button id="btn-load-platform-venue" class="btn-console btn-secondary-console" type="button" style="margin-top: 12px;">Carica onboarding</button>
+            <p id="platform-onboarding-summary" class="console-message" role="status"></p>
+            <div id="platform-onboarding-steps" class="console-table-wrap"></div>
+            <div id="platform-readiness-panel" class="console-card" style="margin-top: 16px; background: rgba(0,0,0,0.25);"></div>
+          </div>
+
+          <div class="console-card">
+            <h3>Review platform</h3>
+            <div class="console-actions">
+              <button id="btn-review-legal" class="btn-console btn-secondary-console" type="button">Approva LEGAL</button>
+              <button id="btn-review-operations" class="btn-console btn-secondary-console" type="button">Approva OPERATIONS</button>
+            </div>
+          </div>
+
+          <div class="console-card">
+            <h3>Inviti OWNER</h3>
+            <div id="platform-invitations"></div>
+          </div>
+
+          <div class="console-card">
+            <h3>Comandi durevoli</h3>
+            <div id="platform-provisioning-commands"></div>
+          </div>
+        </section>
+
+        <section id="owner-onboarding-section" class="console-stack hidden" aria-labelledby="owner-onboarding-title">
+          <div class="console-card">
+            <h3 id="owner-onboarding-title">Onboarding della venue</h3>
+            <p id="owner-onboarding-summary" class="console-message" role="status"></p>
+            <div id="owner-onboarding-steps" class="console-table-wrap"></div>
+          </div>
+          <div class="console-card">
+            <h3>Profilo legale allowlist</h3>
+            <form id="owner-profile-form" class="console-stack">
+              <div class="console-grid">
+                <label class="console-field">Nome<input id="owner-profile-name" class="console-input" required maxlength="255" /></label>
+                <label class="console-field">Partita IVA<input id="owner-profile-vat" class="console-input" required maxlength="32" /></label>
+                <label class="console-field">Indirizzo fiscale<input id="owner-profile-address" class="console-input" required maxlength="255" /></label>
+                <label class="console-field">Città<input id="owner-profile-city" class="console-input" required maxlength="128" /></label>
+                <label class="console-field">CAP<input id="owner-profile-zip" class="console-input" required maxlength="32" /></label>
+              </div>
+              <button id="btn-save-owner-profile" class="btn-console btn-primary-console" type="submit">Salva profilo</button>
+            </form>
+            <p id="owner-profile-message" class="console-message" role="status"></p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/console.ts"></script>
+  </body>
+</html>

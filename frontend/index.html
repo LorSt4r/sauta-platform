@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Sauta - Salta la Fila</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="stylesheet" href="/src/style.css" />
+    <script src="https://js.stripe.com/v3/"></script>
+    <!-- Google Fonts per un look Premium -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <header class="glass-header">
+        <div class="header-content" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1>Sauta.</h1>
+            <p>Salta la fila, goditi la serata.</p>
+          </div>
+          <button id="wallet-btn" class="btn-wallet">
+            🎟️ I miei Drink
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="menu-section">
+          <h2 class="section-title">Menu Drink 🍹</h2>
+          <div id="menu-drinks-grid" class="featured-drinks-grid"></div>
+        </section>
+
+        <!-- Success Overlay -->
+        <div id="success-overlay" class="hidden">
+           <div class="success-overlay-card glass-panel">
+             <div class="success-icon">🎉</div>
+             <h2>Pagamento Ricevuto!</h2>
+             <p>I tuoi drink sono stati aggiunti al portafoglio locale.</p>
+             <div class="success-actions">
+               <button id="success-wallet-btn" class="btn-primary">🎟️ Vedi i miei Drink</button>
+               <button id="success-reset-btn" class="btn-secondary">Ordina ancora</button>
+             </div>
+           </div>
+        </div>
+      </main>
+
+      <div id="checkout-drawer" class="bottom-drawer">
+        <div class="drawer-content glass-panel">
+          <div class="drawer-header">
+            <h3>Carrello</h3>
+            <span id="cart-total">€0.00</span>
+          </div>
+          <div id="cart-items" class="cart-items-list"></div>
+
+          <!-- Blocco Conformità Fiscale GDPR -->
+          <div class="compliance-form">
+            <!-- Feature futura: Invio e-mail facoltativo scontrino
+            <div class="form-group">
+              <label for="checkout-email">Email per scontrino digitale (facoltativa)</label>
+              <input type="email" id="checkout-email" placeholder="utente@esempio.it" class="compliance-input">
+            </div>
+            -->
+            <div class="form-checkbox-group">
+              <input type="checkbox" id="compliance-consent" class="compliance-checkbox">
+              <label for="compliance-consent" class="checkbox-label">
+                Accetto di ricevere il documento commerciale in formato elettronico digitale (D.M. 07/12/2016)
+              </label>
+            </div>
+          </div>
+
+          <div id="pay-btn" class="stripe-mount-point">
+            <!-- Fallback button -->
+            <button id="fallback-pay-btn" class="btn-apple-pay">Paga al banco</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wallet Modal (Full Screen Overlay) -->
+      <div id="wallet-modal" class="hidden">
+        <div class="wallet-header">
+          <h2>I Miei Drink</h2>
+          <button id="wallet-close-btn" class="close-btn">✕</button>
+        </div>
+        <div id="wallet-content" class="wallet-content">
+          <div class="wallet-storage-warning" style="margin-bottom: 15px; padding: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; font-size: 0.8rem; color: #fca5a5;">
+            ⚠️ <strong>Wallet Anonimo:</strong> Biglietti e ricevute sono salvati sul browser. Se cancelli i dati del browser perderai l'accesso al wallet senza possibilità di recupero.
+          </div>
+          <div class="wallet-section-title">Biglietti Attivi 🎟️</div>
+          <div id="wallet-tickets-list">
+            <div class="wallet-empty">Caricamento biglietti...</div>
+          </div>
+
+          <div class="wallet-section-title" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px;">Archivio Scontrini 📄</div>
+          <div id="wallet-history-list">
+            <div class="wallet-empty">Caricamento storico...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification Overlay (Full Screen Anti-Fraud verification) -->
+      <div id="verification-overlay" class="hidden">
+        <button id="verification-close-btn" class="back-btn">✕ Indietro</button>
+        <div class="verification-card glass-panel">
+          <div class="verification-date" id="verification-date">--/--/----</div>
+          <h1 id="verification-title">VODKA REDBULL</h1>
+          <div class="unlock-checkbox-container">
+            <input type="checkbox" id="verify-unlock-checkbox" class="compliance-checkbox">
+            <label for="verify-unlock-checkbox" class="checkbox-label" style="font-size: 0.82rem; color: #f87171; font-weight: 500; cursor: pointer; user-select: none;">
+              Abilita lo swipe (Attiva solo davanti al barman)
+            </label>
+          </div>
+
+          <div class="swipe-container disabled" id="verify-swipe-container">
+            <div class="swipe-track"></div>
+            <div class="swipe-fill" id="verify-fill"></div>
+            <input type="range" min="0" max="100" value="0" class="swipe-slider" id="verify-slider" disabled>
+            <div class="swipe-label" id="verify-label">Scorri per ritirare 👉</div>
+          </div>
+
+          <div class="ticket-message hidden" id="verify-msg"></div>
+        </div>
+        <canvas id="antiFraudCanvas"></canvas>
+      </div>
+
+      <!-- Footer Compliance -->
+      <footer class="compliance-footer">
+        <div class="footer-content">
+          <p>© 2026 Sauta. Tutti i diritti riservati.</p>
+          <div class="footer-links">
+            <a href="#" data-legal-type="privacy">Privacy Policy</a> |
+            <a href="#" data-legal-type="cookie">Cookie Policy</a> |
+            <a href="#" data-legal-type="terms">Termini e Condizioni</a>
+          </div>
+        </div>
+      </footer>
+
+      <!-- Modal di conformità legale (Privacy/Cookie/Termini) -->
+      <div id="legal-modal" class="hidden">
+        <div class="legal-modal-card glass-panel">
+          <div class="legal-modal-header">
+            <h3 id="legal-modal-title">Informativa Legale</h3>
+            <button id="legal-close-btn" class="btn-close-legal">&times;</button>
+          </div>
+          <div class="legal-modal-body" id="legal-modal-body"></div>
+        </div>
+      </div>
+
+      <!-- Receipt Modal for Inline PWA Viewer -->
+      <div id="receipt-modal" class="hidden">
+        <div class="receipt-modal-card glass-panel">
+          <div class="receipt-modal-header">
+            <h3>Scontrino Digitale</h3>
+            <button id="receipt-close-btn" class="btn-close-receipt">&times;</button>
+          </div>
+          <div class="receipt-modal-body" id="receipt-modal-body"></div>
+          <div class="receipt-modal-footer">
+            <button id="receipt-print-btn" class="btn-primary">Stampa 📄</button>
+            <button id="receipt-footer-close-btn" class="btn-secondary">Chiudi</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onboarding Welcome Modal -->
+      <div id="onboarding-modal" class="hidden">
+        <div class="onboarding-card glass-panel">
+          <div class="onboarding-header">
+            <h2>Benvenuto su Sauta! 🍹</h2>
+          </div>
+          <div class="onboarding-body">
+            <p>Sauta ti permette di ordinare e ritirare i tuoi drink al banco saltando la coda in cassa. Ecco come funziona in 3 semplici passi:</p>
+
+            <div class="onboarding-step">
+              <span class="step-num">1</span>
+              <div>
+                <strong>Ordina e Paga</strong>
+                <p>Scegli i tuoi cocktail preferiti e paga in un secondo con Stripe o Apple/Google Pay.</p>
+              </div>
+            </div>
+
+            <div class="onboarding-step">
+              <span class="step-num">2</span>
+              <div>
+                <strong>Accedi al Wallet</strong>
+                <p>Troverai i tuoi ticket digitali cliccando sul pulsante <strong>"I Miei Drink 🎟️"</strong> in alto a destra.</p>
+              </div>
+            </div>
+
+            <div class="onboarding-step">
+              <span class="step-num">3</span>
+              <div>
+                <strong>Ritiro al Banco (Swipe)</strong>
+                <p>Quando sei davanti al barman, clicca sul ticket e trascina lo slider verso destra per riscuotere il drink.</p>
+              </div>
+            </div>
+
+            <div class="onboarding-warning">
+              <h4>⚠️ ATTENZIONE - IMPORTANTE:</h4>
+              <p>Esegui lo <strong>Swipe to Consume</strong> (Scorri per ritirare) <strong>SOLO ED ESCLUSIVAMENTE</strong> di fronte al barman al momento della consegna.</p>
+              <p>Se convalidi il biglietto per errore prima di essere al bancone, il ticket verrà contrassegnato come "utilizzato" e <strong>perderai il drink senza possibilità di rimborso</strong>.</p>
+            </div>
+          </div>
+          <button id="onboarding-close-btn" class="btn-primary" style="width: 100%;">Ho capito, iniziamo! 🚀</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

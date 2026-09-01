@@ -1,0 +1,27 @@
+{
+  "name": "sauta-platform",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test -w shared && npm test -w backend",
+    "test:watch": "npm test -w shared -- -w & npm test -w backend -- -w",
+    "test:coverage": "npm test -w shared -- --coverage && npm test -w backend -- --coverage",
+  "test:backend": "npm test -w backend",
+  "test:shared": "npm test -w shared",
+  "test:e2e": "npm test -w backend -- --config vitest.e2e.config.ts",
+  "test:ui": "npm run test:ui -w backend"
+  },
+  "keywords": [],
+  "author": "Lorenzo Vasile",
+  "license": "UNLICENSED",
+  "description": "Pre-production multi-tenant venue ordering platform with a TypeScript, Fastify and PostgreSQL stack",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ]
+}
