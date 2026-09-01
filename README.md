@@ -1,5 +1,7 @@
 # Sauta Platform
 
+[![CI](https://github.com/LorSt4r/sauta-platform/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/LorSt4r/sauta-platform/actions/workflows/ci-cd.yml)
+
 Sauta is an independently designed, pre-production platform for venue ordering
 and fulfilment. It is a portfolio project: it has not been deployed to real
 venues and this repository does not claim production users or processed

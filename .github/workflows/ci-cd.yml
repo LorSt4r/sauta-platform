@@ -77,9 +77,6 @@ jobs:
       - name: Build frontend package
         run: npm run build -w frontend
 
-      - name: Test backend package
-        run: npm test -w backend
-
       - name: Test backend package with coverage
         run: npm test -w backend -- --coverage
 
